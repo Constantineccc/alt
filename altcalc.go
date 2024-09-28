@@ -1,20 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Введите значение:")
-	expression, _ := reader.ReadString('\n')
-	expression = strings.TrimSpace(expression)
+	var input string
+	fmt.Print("Введите выражение: ")
+	fmt.Scanln(&input)
 
-	result, err := evaluateExpression(expression)
+	result, err := calculate(input)
 	if err != nil {
 		panic(err)
 	}
@@ -22,90 +20,60 @@ func main() {
 	fmt.Println(result)
 }
 
-func evaluateExpression(expression string) (string, error) {
+func calculate(expression string) (string, error) {
 
-	expression = strings.ReplaceAll(expression, " ", "")
+	pattern := `^"([^"]{1,10})"\s*([+\-*/])\s*("([^"]{1,10})"|(\d+))$`
+	re := regexp.MustCompile(pattern)
+	match := re.FindStringSubmatch(expression)
 
-	var operator string
-	var index int
-	for i, char := range expression {
-		if char == '+' || char == '-' || char == '*' || char == '/' {
-			operator = string(char)
-			index = i
-			break
-		}
+	if len(match) == 0 {
+		return "", fmt.Errorf("Неверный формат выражения")
 	}
 
-	if operator == "" {
-		return "", fmt.Errorf("значение не соответсвует условию задачи")
+	str1 := match[1]
+	operation := match[2]
+	operand := match[3]
+
+	// Проверяем длину строк
+	if len(str1) > 10 {
+		return "", fmt.Errorf("Длина первой строки превышает 10 символов")
 	}
 
-	leftPart := expression[:index]
-	rightPart := expression[index+1:]
 
-	var leftString string
-	var leftNumber int
-	var err error
-	if leftPart[0] == '"' && leftPart[len(leftPart)-1] == '"' {
-		leftString = leftPart[1 : len(leftPart)-1]
-	} else {
-		leftNumber, err = strconv.Atoi(leftPart)
-		if err != nil {
-			return "", fmt.Errorf("левая часть должна быть строкой или целым числом")
-		}
-	}
-
-	var rightString string
-	var rightNumber int
-	if operator == "+" || operator == "-" {
-		if rightPart[0] == '"' && rightPart[len(rightPart)-1] == '"' {
-			rightString = rightPart[1 : len(rightPart)-1]
-		} else {
-			return "", fmt.Errorf("правая часть должна быть строкой для операций + и -")
+	var str2 string
+	var num int
+	if strings.HasPrefix(operand, `"`) {
+		str2 = operand[1 : len(operand)-1]
+		if len(str2) > 10 {
+			return "", fmt.Errorf("Длина второй строки превышает 10 символов")
 		}
 	} else {
-		rightNumber, err = strconv.Atoi(rightPart)
-		if err != nil || rightNumber < 1 || rightNumber > 10 {
-			return "", fmt.Errorf("правая часть должна быть целым числом от 1 до 10 для операций * и /")
+		var err error
+		num, err = strconv.Atoi(operand)
+		if err != nil || num < 1 || num > 10 {
+			return "", fmt.Errorf("Число должно быть в диапазоне от 1 до 10")
 		}
 	}
+
 
 	var result string
-	switch operator {
+	switch operation {
 	case "+":
-		if leftString != "" {
-			result = leftString + rightString
-		} else {
-			result = strconv.Itoa(leftNumber) + rightString
-		}
+		result = str1 + str2
 	case "-":
-		if leftString != "" {
-			result = strings.Replace(leftString, rightString, "", 1)
-		} else {
-			return "", fmt.Errorf("операция вычитания не поддерживается для целых чисел")
-		}
+		result = strings.Replace(str1, str2, "", 1)
 	case "*":
-		if leftString != "" {
-			result = strings.Repeat(leftString, rightNumber)
-		} else {
-			result = strconv.Itoa(leftNumber * rightNumber)
-		}
+		result = strings.Repeat(str1, num)
 	case "/":
-		if leftString != "" {
-			if len(leftString) < rightNumber {
-				return "", fmt.Errorf("результатом деления будет пустая строка")
-			}
-			result = leftString[:len(leftString)/rightNumber]
-		} else {
-			result = strconv.Itoa(leftNumber / rightNumber)
-		}
+		result = str1[:len(str1)/num]
 	default:
-		return "", fmt.Errorf("неподдерживаемая операция")
+		return "", fmt.Errorf("Неподдерживаемая операция")
 	}
+
 
 	if len(result) > 40 {
 		result = result[:40] + "..."
 	}
 
-	return result, nil
+	return `"` + result + `"`, nil
 }
